@@ -8,15 +8,36 @@ namespace hnswlib {
 template <typename DataType, typename DistanceType>
 static DistanceType
 Cosine(const void* pVect1, const void* pVect2, const void* qty_ptr) {
+    size_t dim = *((size_t*)qty_ptr);
+    size_t half_dim = dim / 2;
+    size_t second_half_dim = dim - half_dim;
+    
+    DistanceType first_half_product = 0.0;
+    DistanceType second_half_product = 0.0;
+    
     if constexpr (std::is_same_v<DataType, knowhere::fp32>) {
-        return faiss::fvec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, *((size_t*)qty_ptr));
+        first_half_product = faiss::fvec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, half_dim);
+        second_half_product = faiss::fvec_inner_product(
+            (const DataType*)pVect1 + half_dim, 
+            (const DataType*)pVect2 + half_dim, 
+            second_half_dim);
     } else if constexpr (std::is_same_v<DataType, knowhere::fp16>) {
-        return faiss::fp16_vec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, *((size_t*)qty_ptr));
+        first_half_product = faiss::fp16_vec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, half_dim);
+        second_half_product = faiss::fp16_vec_inner_product(
+            (const DataType*)pVect1 + half_dim, 
+            (const DataType*)pVect2 + half_dim, 
+            second_half_dim);
     } else if constexpr (std::is_same_v<DataType, knowhere::bf16>) {
-        return faiss::bf16_vec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, *((size_t*)qty_ptr));
+        first_half_product = faiss::bf16_vec_inner_product((const DataType*)pVect1, (const DataType*)pVect2, half_dim);
+        second_half_product = faiss::bf16_vec_inner_product(
+            (const DataType*)pVect1 + half_dim, 
+            (const DataType*)pVect2 + half_dim, 
+            second_half_dim);
     } else {
         throw std::runtime_error("Unknown Datatype\n");
     }
+    
+    return 2.0 * first_half_product + 0.5 * second_half_product;
 }
 
 template <typename DataType, typename DistanceType>
