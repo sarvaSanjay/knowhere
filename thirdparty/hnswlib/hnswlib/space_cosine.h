@@ -8,6 +8,14 @@ namespace hnswlib {
 template <typename DataType, typename DistanceType>
 static DistanceType
 Cosine(const void* pVect1, const void* pVect2, const void* qty_ptr) {
+    // Software breakpoint: under GDB/LLDB execution stops here; without debugger raises SIGTRAP (process exits)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+    __asm__ volatile("int3");
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    __asm__ volatile("brk #0");
+#else
+    __builtin_trap();
+#endif
     std::cout << "Asamwalaykum lyiari" << std::endl;
     size_t dim = *((size_t*)qty_ptr);
     size_t half_dim = dim / 2;
