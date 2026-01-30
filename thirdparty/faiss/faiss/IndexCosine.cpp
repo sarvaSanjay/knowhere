@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 
 #include <faiss/FaissHook.h>
@@ -117,6 +118,7 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
               q(q),
               b(storage.get_xb()),
               ndis(0) {
+        fprintf(stderr, "[IndexCosine] FlatCosineDis constructor (d=%zu, nb=%zd)\n", d, (size_t)nb);
         // it is the caller's responsibility to ensure that everything is all right.
         inverse_l2_norms = storage.get_inverse_l2_norms();
 
@@ -318,15 +320,19 @@ std::vector<float> L2NormsStorage::as_l2_norms() const {
 
 //
 IndexFlatCosine::IndexFlatCosine() : IndexFlat() {
+    fprintf(stderr, "[IndexCosine] IndexFlatCosine() default constructor\n");
     metric_type = MetricType::METRIC_INNER_PRODUCT;
     is_cosine = true;
 }
 
 //
-IndexFlatCosine::IndexFlatCosine(idx_t d) : IndexFlat(d, MetricType::METRIC_INNER_PRODUCT, true) {}
+IndexFlatCosine::IndexFlatCosine(idx_t d) : IndexFlat(d, MetricType::METRIC_INNER_PRODUCT, true) {
+    fprintf(stderr, "[IndexCosine] IndexFlatCosine(idx_t d=%zd) constructor\n", (size_t)d);
+}
 
 //
 void IndexFlatCosine::add(idx_t n, const float* x) {
+    fprintf(stderr, "[IndexCosine] IndexFlatCosine::add(n=%zd)\n", (size_t)n);
     FAISS_THROW_IF_NOT(is_trained);
     if (n == 0) {
         return;
@@ -341,6 +347,7 @@ void IndexFlatCosine::add(idx_t n, const float* x) {
 }
 
 void IndexFlatCosine::reset() {
+    fprintf(stderr, "[IndexCosine] IndexFlatCosine::reset()\n");
     IndexFlat::reset();
     inverse_norms_storage.reset();
 }
@@ -351,6 +358,7 @@ const float* IndexFlatCosine::get_inverse_l2_norms() const {
 
 //
 FlatCodesDistanceComputer* IndexFlatCosine::get_FlatCodesDistanceComputer() const {
+    fprintf(stderr, "[IndexCosine] IndexFlatCosine::get_FlatCodesDistanceComputer() (search path)\n");
     return new FlatCosineDis(*this);
 }
 
