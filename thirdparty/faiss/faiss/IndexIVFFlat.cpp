@@ -32,6 +32,21 @@
 
 namespace faiss {
 
+namespace {
+
+// When METRIC_INNER_PRODUCT: return 2*(inner_product of first half) + 0.5*(inner_product of second half)
+inline float fvec_inner_product_weighted_halves(
+        const float* x,
+        const float* y,
+        size_t d) {
+    size_t half = d / 2;
+    float ip_first = fvec_inner_product(x, y, half);
+    float ip_second = fvec_inner_product(x + half, y + half, d - half);
+    return 2.0f * ip_first + 0.5f * ip_second;
+}
+
+}  // namespace
+
 /*****************************************
  * IndexIVFFlat implementation
  ******************************************/
@@ -271,7 +286,7 @@ struct IVFFlatScanner : InvertedListScanner {
     float distance_to_code(const uint8_t* code) const override {
         const float* yj = (float*)code;
         float dis = metric == METRIC_INNER_PRODUCT
-                ? fvec_inner_product(xi, yj, d)
+                ? fvec_inner_product_weighted_halves(xi, yj, d)
                 : fvec_L2sqr(xi, yj, d);
         return dis;
     }
@@ -305,8 +320,13 @@ struct IVFFlatScanner : InvertedListScanner {
             };
 
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         }
         else {
             fvec_L2sqr_ny_if(
@@ -335,8 +355,13 @@ struct IVFFlatScanner : InvertedListScanner {
             out.emplace_back(ids[j], dis);
         };
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                    xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         } else {
             fvec_L2sqr_ny_if(xi, list_vecs, d, list_size, filter, apply);
         }
@@ -366,8 +391,13 @@ struct IVFFlatScanner : InvertedListScanner {
             };
 
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         }
         else {
             fvec_L2sqr_ny_if(
@@ -402,7 +432,7 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
     float distance_to_code(const uint8_t* code) const override {
         const float* yj = (float*)code;
         float dis = metric == METRIC_INNER_PRODUCT
-                ? fvec_inner_product(xi, yj, d)
+                ? fvec_inner_product_weighted_halves(xi, yj, d)
                 : fvec_L2sqr(xi, yj, d);
         return dis;
     }
@@ -436,8 +466,13 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
             };
 
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         }
         else {
             fvec_L2sqr_ny_if(
@@ -466,8 +501,13 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
             out.emplace_back(ids[j], dis);
         };
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                    xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         } else {
             fvec_L2sqr_ny_if(xi, list_vecs, d, list_size, filter, apply);
         }
@@ -497,8 +537,13 @@ struct IVFFlatBitsetViewScanner : InvertedListScanner {
             };
 
         if constexpr (metric == METRIC_INNER_PRODUCT) {
-            fvec_inner_products_ny_if(
-                xi, list_vecs, d, list_size, filter, apply);
+            for (size_t j = 0; j < list_size; j++) {
+                if (!filter(j))
+                    continue;
+                const float* yj = list_vecs + d * j;
+                float dis = fvec_inner_product_weighted_halves(xi, yj, d);
+                apply(dis, j);
+            }
         }
         else {
             fvec_L2sqr_ny_if(
