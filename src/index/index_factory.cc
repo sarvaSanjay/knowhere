@@ -66,7 +66,14 @@ IndexFactory::Create(const std::string& name, const int32_t& version, const Obje
                                                "SCANN index is not supported on the current CPU model");
     }
 
-    return fun_map_v->fun_value(version, object);
+    auto result = fun_map_v->fun_value(version, object);
+    if (result.Node() != nullptr) {
+        LOG_KNOWHERE_INFO_ << "IndexFactory::Create: created successfully index_type=" << name << " key=" << key
+                          << " node_type=" << result.Type();
+    } else {
+        LOG_KNOWHERE_INFO_ << "IndexFactory::Create: created (node=null) index_type=" << name << " key=" << key;
+    }
+    return result;
 }
 
 template <typename DataType>

@@ -485,6 +485,10 @@ template <typename DataType, typename IndexType>
 Status
 IvfIndexNode<DataType, IndexType>::Train(const DataSetPtr dataset, std::shared_ptr<Config> cfg,
                                          bool use_knowhere_build_pool) {
+    auto rows = dataset->GetRows();
+    auto dim = dataset->GetDim();
+    LOG_KNOWHERE_INFO_ << "IvfIndexNode::Train: rows=" << rows << " dim=" << dim
+                       << " (knowhere IVF Train; index_type=" << typeid(IndexType).name() << ")";
     // use build_pool_ to make sure the OMP threads spawded by index_->train etc
     // can inherit the low nice value of threads in build_pool_.
     auto build_pool_wrapper = std::make_shared<ThreadPoolWrapper>(build_pool_, use_knowhere_build_pool);
@@ -741,6 +745,7 @@ IvfIndexNode<DataType, IndexType>::Add(const DataSetPtr dataset, std::shared_ptr
     }
     auto data = dataset->GetTensor();
     auto rows = dataset->GetRows();
+    LOG_KNOWHERE_INFO_ << "IvfIndexNode::Add: rows=" << rows << " (knowhere IVF Add; index_type=" << typeid(IndexType).name() << ")";
     const BaseConfig& base_cfg = static_cast<const IvfConfig&>(*cfg);
     // use build_pool_ to make sure the OMP threads spawded by index_->add
     // can inherit the low nice value of threads in build_pool_.
@@ -861,6 +866,8 @@ IvfIndexNode<DataType, IndexType>::Search(const DataSetPtr dataset, std::unique_
 
     auto k = ivf_cfg.k.value();
     auto nprobe = ivf_cfg.nprobe.value();
+    LOG_KNOWHERE_INFO_ << "IvfIndexNode::Search: nq=" << rows << " k=" << k << " nprobe=" << nprobe
+                       << " (knowhere IVF Search; index_type=" << typeid(IndexType).name() << ")";
 
     BitsetView bitset(bitset_);
     if (!internal_offset_to_most_external_id_.empty()) {
