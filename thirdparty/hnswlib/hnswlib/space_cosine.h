@@ -8,6 +8,7 @@ namespace hnswlib {
 template <typename DataType, typename DistanceType>
 static DistanceType
 Cosine(const void* pVect1, const void* pVect2, const void* qty_ptr) {
+    std::cout << "Asamwalaykum lyiari" << std::endl;
     size_t dim = *((size_t*)qty_ptr);
     size_t half_dim = dim / 2;
     size_t second_half_dim = dim - half_dim;
