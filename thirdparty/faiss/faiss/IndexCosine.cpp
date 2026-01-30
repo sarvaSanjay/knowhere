@@ -28,6 +28,7 @@ namespace faiss {
 //
 struct FlatCosineDis : FlatCodesDistanceComputer {
     size_t d;
+    size_t d_half;  // first half size; second half size = d - d_half
     idx_t nb;
     const float* q;
     const float* b;
@@ -35,11 +36,34 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
 
     const float* inverse_l2_norms;
     float inverse_query_norm = 0;
+    float inverse_query_norm_first = 0;
+    float inverse_query_norm_second = 0;
+
+    // Cosine similarity for first half, then second half; return 2*first + 0.5*second
+    float weighted_half_cos(const float* b_vec, size_t n_first, size_t n_second) const {
+        float cos_first = 0.0f;
+        if (n_first > 0 && inverse_query_norm_first > 0) {
+            const float norm_b_first = fvec_norm_L2sqr(b_vec, n_first);
+            if (norm_b_first > 0) {
+                const float dp_first = fvec_inner_product(q, b_vec, n_first);
+                cos_first = dp_first * (1.0f / sqrtf(norm_b_first)) * inverse_query_norm_first;
+            }
+        }
+        float cos_second = 0.0f;
+        if (n_second > 0 && inverse_query_norm_second > 0) {
+            const float norm_b_second = fvec_norm_L2sqr(b_vec + n_first, n_second);
+            if (norm_b_second > 0) {
+                const float dp_second = fvec_inner_product(q + n_first, b_vec + n_first, n_second);
+                cos_second = dp_second * (1.0f / sqrtf(norm_b_second)) * inverse_query_norm_second;
+            }
+        }
+        return 2.0f * cos_first + 0.5f * cos_second;
+    }
 
     float distance_to_code(const uint8_t* code) final {
         ndis++;
-        const float norm = fvec_norm_L2sqr((const float*)code, d);
-        return (norm == 0) ? 0 : (fvec_inner_product(q, (const float*)code, d) / sqrtf(norm) * inverse_query_norm);
+        const float* y = (const float*)code;
+        return weighted_half_cos(y, d_half, d - d_half);
     }
 
     float operator()(const idx_t i) final override {
@@ -48,13 +72,10 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
 
         prefetch_L2(inverse_l2_norms + i);
 
-        const float dp0 = fvec_inner_product(q, y_i, d);
-
-        const float inverse_code_norm_i = inverse_l2_norms[i];
-        const float distance = dp0 * inverse_code_norm_i * inverse_query_norm;
-        return distance;
+        return weighted_half_cos(y_i, d_half, d - d_half);
     }
 
+    // Symmetric: 2 * cos(y_i, y_j) first half + 0.5 * cos(y_i, y_j) second half
     float symmetric_dis(idx_t i, idx_t j) final override {
         const float* __restrict y_i =
                 reinterpret_cast<const float*>(codes + i * code_size);
@@ -64,12 +85,26 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
         prefetch_L2(inverse_l2_norms + i);
         prefetch_L2(inverse_l2_norms + j);
 
-        const float dp0 = fvec_inner_product(y_i, y_j, d);
-
-        const float inverse_code_norm_i = inverse_l2_norms[i];
-        const float inverse_code_norm_j = inverse_l2_norms[j];
-
-        return dp0 * inverse_code_norm_i * inverse_code_norm_j;
+        float dis_first = 0.0f;
+        if (d_half > 0) {
+            const float norm_i_first = fvec_norm_L2sqr(y_i, d_half);
+            const float norm_j_first = fvec_norm_L2sqr(y_j, d_half);
+            if (norm_i_first > 0 && norm_j_first > 0) {
+                const float dp_first = fvec_inner_product(y_i, y_j, d_half);
+                dis_first = dp_first / (sqrtf(norm_i_first) * sqrtf(norm_j_first));
+            }
+        }
+        float dis_second = 0.0f;
+        const size_t n_second = d - d_half;
+        if (n_second > 0) {
+            const float norm_i_second = fvec_norm_L2sqr(y_i + d_half, n_second);
+            const float norm_j_second = fvec_norm_L2sqr(y_j + d_half, n_second);
+            if (norm_i_second > 0 && norm_j_second > 0) {
+                const float dp_second = fvec_inner_product(y_i + d_half, y_j + d_half, n_second);
+                dis_second = dp_second / (sqrtf(norm_i_second) * sqrtf(norm_j_second));
+            }
+        }
+        return 2.0f * dis_first + 0.5f * dis_second;
     }
 
     explicit FlatCosineDis(const IndexFlatCosine& storage, const float* q = nullptr)
@@ -77,6 +112,7 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
                       storage.codes.data(),
                       storage.code_size),
               d(storage.d),
+              d_half(storage.d / 2),
               nb(storage.ntotal),
               q(q),
               b(storage.get_xb()),
@@ -87,8 +123,23 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
         if (q != nullptr) {
             const float query_l2norm = fvec_norm_L2sqr(q, d);
             inverse_query_norm = (query_l2norm <= 0) ? 1.0f : (1.0f / sqrtf(query_l2norm));
+            const size_t n_second = d - d_half;
+            if (d_half > 0) {
+                const float query_l2norm_first = fvec_norm_L2sqr(q, d_half);
+                inverse_query_norm_first = (query_l2norm_first <= 0) ? 0 : (1.0f / sqrtf(query_l2norm_first));
+            } else {
+                inverse_query_norm_first = 0;
+            }
+            if (n_second > 0) {
+                const float query_l2norm_second = fvec_norm_L2sqr(q + d_half, n_second);
+                inverse_query_norm_second = (query_l2norm_second <= 0) ? 0 : (1.0f / sqrtf(query_l2norm_second));
+            } else {
+                inverse_query_norm_second = 0;
+            }
         } else {
             inverse_query_norm = 0;
+            inverse_query_norm_first = 0;
+            inverse_query_norm_second = 0;
         }
     }
 
@@ -98,12 +149,27 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
         if (q != nullptr) {
             const float query_l2norm = fvec_norm_L2sqr(q, d);
             inverse_query_norm = (query_l2norm <= 0) ? 1.0f : (1.0f / sqrtf(query_l2norm));
+            const size_t n_second = d - d_half;
+            if (d_half > 0) {
+                const float query_l2norm_first = fvec_norm_L2sqr(q, d_half);
+                inverse_query_norm_first = (query_l2norm_first <= 0) ? 0 : (1.0f / sqrtf(query_l2norm_first));
+            } else {
+                inverse_query_norm_first = 0;
+            }
+            if (n_second > 0) {
+                const float query_l2norm_second = fvec_norm_L2sqr(q + d_half, n_second);
+                inverse_query_norm_second = (query_l2norm_second <= 0) ? 0 : (1.0f / sqrtf(query_l2norm_second));
+            } else {
+                inverse_query_norm_second = 0;
+            }
         } else {
             inverse_query_norm = 0;
+            inverse_query_norm_first = 0;
+            inverse_query_norm_second = 0;
         }
     }
 
-    // compute four distances
+    // compute four distances: 2*cos(first half) + 0.5*cos(second half) each
     void distances_batch_4(
             const idx_t idx0,
             const idx_t idx1,
@@ -115,7 +181,6 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
             float& dis3) final override {
         ndis += 4;
 
-        // compute first, assign next
         const float* __restrict y0 =
                 reinterpret_cast<const float*>(codes + idx0 * code_size);
         const float* __restrict y1 =
@@ -130,21 +195,11 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
         prefetch_L2(inverse_l2_norms + idx2);
         prefetch_L2(inverse_l2_norms + idx3);
 
-        float dp0 = 0;
-        float dp1 = 0;
-        float dp2 = 0;
-        float dp3 = 0;
-        fvec_inner_product_batch_4(q, y0, y1, y2, y3, d, dp0, dp1, dp2, dp3);
-        
-        const float inverse_code_norm0 = inverse_l2_norms[idx0];
-        const float inverse_code_norm1 = inverse_l2_norms[idx1];
-        const float inverse_code_norm2 = inverse_l2_norms[idx2];
-        const float inverse_code_norm3 = inverse_l2_norms[idx3];
-        
-        dis0 = dp0 * inverse_code_norm0 * inverse_query_norm;
-        dis1 = dp1 * inverse_code_norm1 * inverse_query_norm;
-        dis2 = dp2 * inverse_code_norm2 * inverse_query_norm;
-        dis3 = dp3 * inverse_code_norm3 * inverse_query_norm;
+        const size_t n_second = d - d_half;
+        dis0 = weighted_half_cos(y0, d_half, n_second);
+        dis1 = weighted_half_cos(y1, d_half, n_second);
+        dis2 = weighted_half_cos(y2, d_half, n_second);
+        dis3 = weighted_half_cos(y3, d_half, n_second);
     }
 };
 
