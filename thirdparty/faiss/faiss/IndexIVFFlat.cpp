@@ -15,6 +15,7 @@
 #include <cinttypes>
 #include <cstdio>
 
+#include "knowhere/log.h"
 #include "knowhere/object.h"
 #include "knowhere/utils.h"
 #include "knowhere/bitsetview_idselector.h"
@@ -39,6 +40,7 @@ inline float fvec_inner_product_weighted_halves(
         const float* x,
         const float* y,
         size_t d) {
+    LOG_KNOWHERE_INFO_ << "fvec_inner_product_weighted_halves";
     size_t half = d / 2;
     float ip_first = fvec_inner_product(x, y, half);
     float ip_second = fvec_inner_product(x + half, y + half, d - half);
@@ -76,6 +78,7 @@ void IndexIVFFlat::train(idx_t n, const float* x) {
 }
 
 void IndexIVFFlat::add_with_ids(idx_t n, const float* x, const idx_t* xids) {
+    LOG_KNOWHERE_INFO_ << "IndexIVFFlat::add_with_ids: inserting n=" << n << " vectors (ntotal before=" << ntotal << ")";
     std::unique_ptr<idx_t[]> coarse_idx(new idx_t[n]);
     if (is_cosine) {
         auto x_normalized = std::make_unique<float[]>(n * d);
@@ -136,6 +139,7 @@ void IndexIVFFlat::add_core(
         }
     }
 
+    LOG_KNOWHERE_INFO_ << "IndexIVFFlat::add_core: added n_add=" << n_add << " / n=" << n << " (ntotal after=" << (ntotal + n) << ")";
     if (verbose) {
         printf("IndexIVFFlat::add_core: added %" PRId64 " / %" PRId64
                " vectors\n",
@@ -590,6 +594,22 @@ InvertedListScanner* get_InvertedListScanner1(
 }
 
 } // anonymous namespace
+
+void IndexIVFFlat::search_preassigned(
+        idx_t n,
+        const float* x,
+        idx_t k,
+        const idx_t* assign,
+        const float* centroid_dis,
+        float* distances,
+        idx_t* labels,
+        bool store_pairs,
+        const IVFSearchParameters* params,
+        IndexIVFStats* stats) const {
+    LOG_KNOWHERE_INFO_ << "IndexIVFFlat::search_preassigned: query n=" << n << " k=" << k << " (ntotal=" << ntotal << ")";
+    IndexIVF::search_preassigned(
+            n, x, k, assign, centroid_dis, distances, labels, store_pairs, params, stats);
+}
 
 InvertedListScanner* IndexIVFFlat::get_InvertedListScanner(
         bool store_pairs,
