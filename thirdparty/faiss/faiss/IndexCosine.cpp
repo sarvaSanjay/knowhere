@@ -42,6 +42,7 @@ struct FlatCosineDis : FlatCodesDistanceComputer {
 
     // Cosine similarity for first half, then second half; return 2*first + 0.5*second
     float weighted_half_cos(const float* b_vec, size_t n_first, size_t n_second) const {
+        LOG_KNOWHERE_INFO_ << "weighted_half_cos";
         float cos_first = 0.0f;
         if (n_first > 0 && inverse_query_norm_first > 0) {
             const float norm_b_first = fvec_norm_L2sqr(b_vec, n_first);

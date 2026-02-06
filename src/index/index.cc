@@ -73,6 +73,8 @@ Index<T>::BuildAsync(const DataSetPtr dataset, const Json& json, bool use_knowhe
 template <typename T>
 inline Status
 Index<T>::Build(const DataSetPtr dataset, const Json& json, bool use_knowhere_build_pool) {
+    LOG_KNOWHERE_INFO_ << "Index::Build called rows=" << (dataset ? dataset->GetRows() : 0)
+                       << " type=" << (this->node ? this->node->Type() : "null");
     auto cfg = this->node->CreateConfig();
     RETURN_IF_ERROR(LoadConfig(cfg.get(), json, knowhere::TRAIN, "Build"));
 
@@ -91,6 +93,8 @@ Index<T>::Build(const DataSetPtr dataset, const Json& json, bool use_knowhere_bu
 template <typename T>
 inline Status
 Index<T>::Train(const DataSetPtr dataset, const Json& json, bool use_knowhere_build_pool) {
+    LOG_KNOWHERE_INFO_ << "Index::Train called rows=" << (dataset ? dataset->GetRows() : 0)
+                       << " type=" << (this->node ? this->node->Type() : "null");
     bool is_emb_list = dataset->Get<const size_t*>(knowhere::meta::EMB_LIST_OFFSET) != nullptr;
     if (is_emb_list) {
         // should use Index::Build instead.
@@ -106,6 +110,8 @@ Index<T>::Train(const DataSetPtr dataset, const Json& json, bool use_knowhere_bu
 template <typename T>
 inline Status
 Index<T>::Add(const DataSetPtr dataset, const Json& json, bool use_knowhere_build_pool) {
+    LOG_KNOWHERE_INFO_ << "Index::Add called rows=" << (dataset ? dataset->GetRows() : 0)
+                       << " type=" << (this->node ? this->node->Type() : "null");
     auto cfg = this->node->CreateConfig();
     std::string msg;
     RETURN_IF_ERROR(LoadConfig(cfg.get(), json, knowhere::TRAIN, "Add", &msg));
@@ -116,6 +122,8 @@ template <typename T>
 inline expected<DataSetPtr>
 Index<T>::Search(const DataSetPtr dataset, const Json& json, const BitsetView& bitset_,
                  milvus::OpContext* op_context) const {
+    LOG_KNOWHERE_INFO_ << "Index::Search called nq=" << (dataset ? dataset->GetRows() : 0)
+                       << " type=" << (this->node ? this->node->Type() : "null");
     auto cfg = this->node->CreateConfig();
     std::string msg;
     const Status load_status = LoadConfig(cfg.get(), json, knowhere::SEARCH, "Search", &msg);
